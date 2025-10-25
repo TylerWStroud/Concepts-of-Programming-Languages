@@ -1,0 +1,34 @@
+program = import_section, implementations_section;
+
+import_section = [ "import", string_literal ];
+implementations_section = "implementations", function_definition;
+
+function_definition = "function", identifier, "return type", type, "is",
+                        variables_section,
+                        "begin", statement_list,
+                        "endfun", identifier;
+
+variables_section = [ "variables", { variable_declaration } ];
+variable_declaration = "define", identifier, "of type", type;
+
+type = "integer" | "double";
+
+statement_list = { statement };
+statement = display_statement | assignment_statement | exit_statement;
+
+display_statement = "display", display_item, { ",", display_item };
+display_item = string_literal | expression;
+
+assignment_statement  = "set", identifier, "=", expression;
+exit_statement = "exit";
+
+expression = identifier | number | string_literal;
+
+identifier = letter, { alphanumeric_char };
+number = double_literal;
+double_literal = digit, { digit }, ".", digit, { digit };
+string_literal = '"', { character }, '"';
+
+letter = "a" | "b" | ... | "z" | "A" | "B" | ... | "Z";
+digit  = "0" | "1" | ... | "9";
+alphanumeric_char = letter | digit;
