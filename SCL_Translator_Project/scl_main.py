@@ -1,40 +1,50 @@
 import sys
-from scl_scanner import SCLScanner
+import json
 from scl_parser import SCLParser
 
 def main():
     if len(sys.argv) != 2:
-        print("Usage: python scl_main.py <filename.scl>")
+        print("Usage: python run_parser.py <tokens_json_file>")
         sys.exit(1)
     
-    filename = sys.argv[1]
+    input_file = sys.argv[1]
     
     try:
-        # 1. Scan (lexical analysis)
-        with open(filename, 'r') as file:
-            source_code = file.read()
+        # Read tokens from JSON file
+        with open(input_file, 'r') as f:
+            tokens_data = json.load(f)
         
-        scanner = SCLScanner()
-        tokens = scanner.scan(source_code)
+        print(f"Loaded {len(tokens_data['tokens'])} tokens from {input_file}")
         
-        print("=== SCANNER RESULTS ===")
-        for token in tokens[:10]:  # Show first 10 tokens
-            print(f"{token.type.value:15} {token.value:20}")
+        # Parse the tokens
+        parser = SCLParser(tokens_data)
+        result = parser.parse()
         
-        # 2. Parse (syntax analysis)
-        parser = SCLParser(tokens)
-        parse_success = parser.begin()
+        # Output results
+        output_file = input_file.replace('_tokens.json', '_parse_tree.json')
+        with open(output_file, 'w') as f:
+            json.dump(result, f, indent=2)
         
-        print(f"\n=== PARSER RESULTS ===")
-        print(f"Parse successful: {parse_success}")
-        print(f"Symbols in table: {len(parser.symbol_table)}")
-        print(f"Errors found: {len(parser.errors)}")
+        print(f"\n=== PARSING RESULTS ===")
+        print(f"Success: {result['success']}")
+        print(f"Symbols in table: {len(result['symbol_table'])}")
+        print(f"Errors: {len(result['errors'])}")
+        print(f"Parse tree saved to: {output_file}")
         
-        for error in parser.errors:
-            print(f"ERROR: {error}")
-            
+        if result['errors']:
+            print("\nErrors found:")
+            for error in result['errors']:
+                print(f"  - {error}")
+        
+        if result['symbol_table']:
+            print(f"\nSymbol Table ({len(result['symbol_table'])} items):")
+            for symbol in sorted(result['symbol_table']):
+                print(f"  - {symbol}")
+                
     except Exception as e:
         print(f"Error: {e}")
+        import traceback
+        traceback.print_exc()
 
 if __name__ == "__main__":
     main()
