@@ -1,8 +1,7 @@
-
-"""
+'''
 SCL Language Scanner
 Complete scanner implementation for SCL language subset
-"""
+'''
 
 import sys
 import json
@@ -111,54 +110,6 @@ class Token:
 class SCLScanner:
     def __init__(self):
         # SCL Keywords
-        self.keywords = {
-            'import': TokenType.IMPORT,
-            'description': TokenType.DESCRIPTION,
-            'symbol': TokenType.SYMBOL,
-            'forward': TokenType.FORWARD,
-            'declarations': TokenType.DECLARATIONS,
-            'function': TokenType.FUNCTION,
-            'return': TokenType.RETURN,
-            'parameters': TokenType.PARAMETERS,
-            'specifications': TokenType.SPECIFICATIONS,
-            'enumerate': TokenType.ENUMERATE,
-            'is': TokenType.IS,
-            'endenum': TokenType.ENDENUM,
-            'struct': TokenType.STRUCT,
-            'endstruct': TokenType.ENDSTRUCT,
-            'global': TokenType.GLOBAL,
-            'constants': TokenType.CONSTANTS,
-            'variables': TokenType.VARIABLES,
-            'structures': TokenType.STRUCTURES,
-            'implementations': TokenType.IMPLEMENTATIONS,
-            'begin': TokenType.BEGIN,
-            'endfun': TokenType.ENDFUN,
-            'set': TokenType.SET,
-            'input': TokenType.INPUT,
-            'display': TokenType.DISPLAY,
-            'exit': TokenType.EXIT,
-            'for': TokenType.FOR,
-            'to': TokenType.TO,
-            'do': TokenType.DO,
-            'endfor': TokenType.ENDFOR,
-            'while': TokenType.WHILE,
-            'endwhile': TokenType.ENDWHILE,
-            'if': TokenType.IF,
-            'then': TokenType.THEN,
-            'endif': TokenType.ENDIF,
-            'increment': TokenType.INCREMENT,
-            
-            # Types and declarations
-            'integer': TokenType.INTEGER,
-            'float': TokenType.FLOAT,
-            'double': TokenType.DOUBLE,
-            'char': TokenType.CHAR,
-            'byte': TokenType.BYTE,
-            'array': TokenType.ARRAY,
-            'of': TokenType.OF,
-            'define': TokenType.DEFINE,
-            'type': TokenType.TYPE,
-        }
         
         self.source = ""
         self.tokens = []
@@ -167,6 +118,23 @@ class SCLScanner:
         self.current = 0
         self.start = 0
         self.identifiers = set()
+
+    def identifier(self):
+        while self.peek().isalnum() or self.peek() == '_':
+            self.advance()
+        
+        value = self.source[self.start:self.current]
+        lower_value = value.lower()
+        
+        # Use the enum directly instead of the dictionary
+        for token_type in TokenType:
+            if token_type.value.lower() == lower_value:
+                self.add_token(token_type)
+                return
+        
+        # If not a keyword, it's an identifier
+        self.identifiers.add(value)
+        self.add_token(TokenType.IDENTIFIER, value)
 
     def scan(self, source: str) -> List[Token]:
         """Scan the source code and return list of tokens"""
@@ -363,18 +331,6 @@ class SCLScanner:
         else:
             self.add_token(TokenType.NUMBER, value)
 
-    def identifier(self):
-        while self.peek().isalnum() or self.peek() == '_':
-            self.advance()
-        
-        value = self.source[self.start:self.current]
-        lower_value = value.lower()
-        
-        if lower_value in self.keywords:
-            self.add_token(self.keywords[lower_value])
-        else:
-            self.identifiers.add(value)
-            self.add_token(TokenType.IDENTIFIER, value)
 
 def main():
     if len(sys.argv) != 2:

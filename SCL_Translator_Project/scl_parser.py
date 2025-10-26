@@ -1,8 +1,13 @@
-# scl_parser.py
+'''
+SCL Language Parser
+Complete Parser implementation for SCL language subset
+'''
+
 import json
 import sys
 from dataclasses import dataclass
 from typing import List, Any, Dict, Optional
+from scl_constants import VALID_TYPES, ErrorMessages, DebugMessages
 
 @dataclass
 class ParseTreeNode:
@@ -40,26 +45,25 @@ class SCLParser:
     # ========== REQUIRED PUBLIC FUNCTIONS ==========
     
     def getNextToken(self):
-        """Public function - returns the next token that is not a comment"""
-        # Skip comments (though your scanner already filters them out)
-        while (self.current < len(self.tokens) and 
-               self._is_comment_token(self._current_token())):
+        # Public function - returns the next token that is not a comment
+        # Skip comments (though scanner already filters them out)
+        while (self.current < len(self.tokens)): 
             self.current += 1
         
         return self._current_token()
     
     def identifierExists(self, identifier: str) -> bool:
-        """Public function - returns true if an identifier has already been declared"""
+        # Public function - returns true if an identifier has already been declared
         return identifier in self.symbol_table
     
     def begin(self):
-        """Public function - calls the private start() function"""
+        # Public function - calls the private start() function
         return self._start()
     
     # ========== PRIVATE FUNCTIONS ==========
     
     def _start(self):
-        """Private function - the first nonterminal in the grammar subset"""
+        # First nonterminal in the grammar subset
         self.parse_tree = ParseTreeNode("PROGRAM")
         success = self._program(self.parse_tree)
         
@@ -72,11 +76,6 @@ class SCLParser:
         }
         
         return result
-    
-    def _is_comment_token(self, token):
-        """Check if token is a comment (though scanner should have filtered these)"""
-        # Based on your scanner output, comments are already removed
-        return False
     
     def _current_token(self):
         if self.current >= len(self.tokens):
@@ -113,10 +112,10 @@ class SCLParser:
     # ========== GRAMMAR RULES (PRIVATE) ==========
     
     def _program(self, parent_node):
-        """program → import? implementations function_definition"""
-        print("Starting to parse program...")
+        # program => import? implementations function_definition
+        print(DebugMessages.PARSING_PROGRAM)
         
-        # Parse import statement (optional)
+        # Parse import statement
         if self._current_token()["type"] == "IMPORT":
             import_node = ParseTreeNode("IMPORT_STATEMENT")
             if self._import_statement(import_node):
@@ -124,7 +123,7 @@ class SCLParser:
         
         # Parse implementations section
         if not self._match("IMPLEMENTATIONS", parent_node):
-            self.errors.append("Expected IMPLEMENTATIONS section")
+            self.errors.append(ErrorMessages.EXPECTED_IMPLEMENTATIONS)
             return False
         
         # Parse function definition
@@ -136,8 +135,8 @@ class SCLParser:
             return False
     
     def _import_statement(self, parent_node):
-        """import → IMPORT STRING"""
-        print("Parsing import statement...")
+        # import => IMPORT STRING
+        print(DebugMessages.PARSING_IMPORT)
         
         if not self._match("IMPORT", parent_node):
             return False
@@ -148,8 +147,8 @@ class SCLParser:
         return True
     
     def _function_definition(self, parent_node):
-        """function_definition → FUNCTION IDENTIFIER RETURN TYPE type IS variables? BEGIN statements ENDFUN IDENTIFIER"""
-        print("Parsing function definition...")
+        # function_definition => FUNCTION IDENTIFIER RETURN TYPE type IS variables? BEGIN statements ENDFUN IDENTIFIER
+        print(DebugMessages.PARSING_FUNCTION)
         
         if not self._match("FUNCTION", parent_node):
             return False
@@ -169,8 +168,8 @@ class SCLParser:
         
         # Actual type (INTEGER, DOUBLE, etc.)
         type_token = self._current_token()
-        if type_token["type"] not in ["INTEGER", "DOUBLE", "FLOAT", "CHAR", "BYTE"]:
-            self.errors.append(f"Expected type, found {type_token['type']}")
+        if type_token["type"] not in VALID_TYPES:
+            self.errors.append(ErrorMessages.EXPECTED_TYPE.format(found_type=type_token['type']))
             return False
         self._match(type_token["type"], parent_node)
         
@@ -202,13 +201,13 @@ class SCLParser:
         
         endfun_name = self._previous_token()["value"]
         if endfun_name != func_name:
-            self.errors.append(f"Function name mismatch: started with '{func_name}', ended with '{endfun_name}'")
+            self.errors.append(ErrorMessages.FUNCTION_NAME_MISMATCH.format(start_name=func_name, end_name=endfun_name))
         
         return True
     
     def _variables_section(self, parent_node):
-        """variables → VARIABLES (define_statement)+"""
-        print("Parsing variables section...")
+        # variables => VARIABLES (define_statement)+
+        print(DebugMessages.PARSING_VARIABLES)
         
         if not self._match("VARIABLES", parent_node):
             return False
@@ -224,8 +223,8 @@ class SCLParser:
         return True
     
     def _define_statement(self, parent_node):
-        """define_statement → DEFINE IDENTIFIER OF TYPE type"""
-        print("Parsing define statement...")
+        # # define_statement => DEFINE IDENTIFIER OF TYPE type
+        print(DebugMessages.PARSING_DEFINE)
         
         if not self._match("DEFINE", parent_node):
             return False
@@ -244,16 +243,16 @@ class SCLParser:
         
         # Actual type
         type_token = self._current_token()
-        if type_token["type"] not in ["INTEGER", "DOUBLE", "FLOAT", "CHAR", "BYTE"]:
-            self.errors.append(f"Expected type in define, found {type_token['type']}")
+        if type_token["type"] not in VALID_TYPES:
+            self.errors.append(ErrorMessages.EXPECTED_TYPE_IN_DEFINE.format(found_type=type_token['type']))
             return False
         self._match(type_token["type"], parent_node)
         
         return True
     
     def _statements(self, parent_node):
-        """statements → (display_statement | set_statement | exit_statement)+"""
-        print("Parsing statements...")
+        # statements => (display_statement | set_statement | exit_statement)+
+        print(DebugMessages.PARSING_STATEMENTS)
         
         statement_count = 0
         while self._current_token()["type"] in ["DISPLAY", "SET", "EXIT"]:
@@ -276,14 +275,14 @@ class SCLParser:
                 break
         
         if statement_count == 0:
-            self.errors.append("No statements found in BEGIN section")
+            self.errors.append(ErrorMessages.NO_STATEMENTS_FOUND)
             return False
         
         return True
     
     def _display_statement(self, parent_node):
-        """display_statement → DISPLAY (STRING | IDENTIFIER) (COMMA (STRING | IDENTIFIER))*"""
-        print("Parsing display statement...")
+        # display_statement => DISPLAY (STRING | IDENTIFIER) (COMMA (STRING | IDENTIFIER))*
+        print(DebugMessages.PARSING_DISPLAY)
         
         if not self._match("DISPLAY", parent_node):
             return False
@@ -291,7 +290,7 @@ class SCLParser:
         # First display item (required)
         token = self._current_token()
         if token["type"] not in ["STRING", "IDENTIFIER"]:
-            self.errors.append(f"Expected STRING or IDENTIFIER in display, found {token['type']}")
+            self.errors.append(ErrorMessages.EXPECTED_STRING_OR_IDENTIFIER.format(found_type=token['type']))
             return False
         self._match(token["type"], parent_node)
         
@@ -300,15 +299,15 @@ class SCLParser:
             self._match("COMMA", parent_node)
             token = self._current_token()
             if token["type"] not in ["STRING", "IDENTIFIER"]:
-                self.errors.append(f"Expected STRING or IDENTIFIER after comma, found {token['type']}")
+                self.errors.append(ErrorMessages.EXPECTED_STRING_OR_IDENTIFIER_AFTER_COMMA.format(found_type=token['type']))
                 return False
             self._match(token["type"], parent_node)
         
         return True
     
     def _set_statement(self, parent_node):
-        """set_statement → SET IDENTIFIER ASSIGN expression"""
-        print("Parsing set statement...")
+        # set_statement => SET IDENTIFIER ASSIGN expression
+        print(DebugMessages.PARSING_SET)
         
         if not self._match("SET", parent_node):
             return False
@@ -319,7 +318,7 @@ class SCLParser:
         var_name = self._previous_token()["value"]
         # Check if variable is declared (using the public function)
         if not self.identifierExists(var_name):
-            self.errors.append(f"Variable '{var_name}' used in SET statement but not declared")
+            self.errors.append(ErrorMessages.VARIABLE_NOT_DECLARED.format(var_name=var_name, context="SET statement"))
         
         if not self._match("ASSIGN", parent_node):
             return False
@@ -327,20 +326,20 @@ class SCLParser:
         # Simple expression - just take the next token
         token = self._current_token()
         if token["type"] not in ["IDENTIFIER", "NUMBER", "FLOAT_NUMBER", "HEX_NUMBER"]:
-            self.errors.append(f"Expected expression in set, found {token['type']}")
+            self.errors.append(ErrorMessages.EXPECTED_EXPRESSION.format(found_type=token['type']))
             return False
         
         # If it's an identifier, check if it's declared
         if token["type"] == "IDENTIFIER" and not self.identifierExists(token["value"]):
-            self.errors.append(f"Variable '{token['value']}' used in expression but not declared")
+            self.errors.append(ErrorMessages.VARIABLE_NOT_DECLARED.format(var_name=token['value'], context="expression"))
         
         self._match(token["type"], parent_node)
         
         return True
     
     def _exit_statement(self, parent_node):
-        """exit_statement → EXIT"""
-        print("Parsing exit statement...")
+        # exit_statement => EXIT
+        print(DebugMessages.PARSING_EXIT)
         
         if not self._match("EXIT", parent_node):
             return False
