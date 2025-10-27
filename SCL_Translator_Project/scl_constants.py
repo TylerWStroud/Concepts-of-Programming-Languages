@@ -2,7 +2,7 @@
 """Constants and configuration for SCL language processing"""
 
 # Valid data types
-VALID_TYPES = ["INTEGER", "DOUBLE", "FLOAT", "CHAR", "BYTE"]
+VALID_TYPES = ["INTEGER", "DOUBLE", "FLOAT", "CHAR", "BYTE", "STRING", "BOOLEAN", "LONG", "ADDRESS"]
 
 # Common error messages
 class ErrorMessages:

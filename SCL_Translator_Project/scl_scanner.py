@@ -47,6 +47,13 @@ class TokenType(Enum):
     THEN = "THEN"
     ENDIF = "ENDIF"
     INCREMENT = "INCREMENT"
+    ADDRESSOF = "ADDRESSOF"
+    DEREFERENCE = "DEREFERENCE"
+    ADDRESS = "ADDRESS"
+    CALL = "CALL"
+    USING = "USING"
+    CREATE = "CREATE"
+    DESTROY = "DESTROY"
     
     # Types
     TYPE = "TYPE"
@@ -84,6 +91,7 @@ class TokenType(Enum):
     LSHIFT = "LSHIFT"
     RSHIFT = "RSHIFT"
     CARET = "CARET"
+    ARROW = "ARROW"
     
     # Delimiters
     LPAREN = "LPAREN"
@@ -245,7 +253,10 @@ class SCLScanner:
         elif char == '+':
             self.add_token(TokenType.PLUS)
         elif char == '-':
-            self.add_token(TokenType.MINUS)
+            if self.match('>'):
+                self.add_token(TokenType.ARROW, "->")
+            else:
+                self.add_token(TokenType.MINUS)
         elif char == '*':
             self.add_token(TokenType.MULTIPLY)
         elif char == '/':

@@ -17,13 +17,6 @@
             "line": 8,
             "column": 7,
             "children": []
-          },
-          {
-            "type": "STRING",
-            "value": "scl.h",
-            "line": 8,
-            "column": 15,
-            "children": []
           }
         ]
       },
@@ -35,256 +28,264 @@
         "children": []
       },
       {
-        "type": "FUNCTION_DEFINITION",
+        "type": "FUNCTION_DEFINITIONS",
         "value": null,
         "line": 0,
         "column": 0,
         "children": [
           {
-            "type": "FUNCTION",
-            "value": "function",
-            "line": 10,
-            "column": 9,
-            "children": []
-          },
-          {
-            "type": "IDENTIFIER",
-            "value": "main",
-            "line": 10,
-            "column": 14,
-            "children": []
-          },
-          {
-            "type": "RETURN",
-            "value": "return",
-            "line": 10,
-            "column": 21,
-            "children": []
-          },
-          {
-            "type": "TYPE",
-            "value": "type",
-            "line": 10,
-            "column": 26,
-            "children": []
-          },
-          {
-            "type": "INTEGER",
-            "value": "integer",
-            "line": 10,
-            "column": 34,
-            "children": []
-          },
-          {
-            "type": "IS",
-            "value": "is",
-            "line": 10,
-            "column": 37,
-            "children": []
-          },
-          {
-            "type": "VARIABLES_SECTION",
+            "type": "FUNCTION_DEFINITION",
             "value": null,
             "line": 0,
             "column": 0,
             "children": [
               {
-                "type": "VARIABLES",
-                "value": "variables",
-                "line": 11,
-                "column": 10,
+                "type": "FUNCTION",
+                "value": "function",
+                "line": 10,
+                "column": 9,
                 "children": []
               },
               {
-                "type": "VARIABLE_DEFINE",
+                "type": "IDENTIFIER",
+                "value": "main",
+                "line": 10,
+                "column": 14,
+                "children": []
+              },
+              {
+                "type": "RETURN",
+                "value": "return",
+                "line": 10,
+                "column": 21,
+                "children": []
+              },
+              {
+                "type": "TYPE",
+                "value": "type",
+                "line": 10,
+                "column": 26,
+                "children": []
+              },
+              {
+                "type": "INTEGER",
+                "value": "integer",
+                "line": 10,
+                "column": 34,
+                "children": []
+              },
+              {
+                "type": "IS",
+                "value": "is",
+                "line": 10,
+                "column": 37,
+                "children": []
+              },
+              {
+                "type": "VARIABLES_SECTION",
                 "value": null,
                 "line": 0,
                 "column": 0,
                 "children": [
                   {
-                    "type": "DEFINE",
-                    "value": "define",
-                    "line": 12,
-                    "column": 11,
-                    "children": []
-                  },
-                  {
-                    "type": "IDENTIFIER",
-                    "value": "x",
-                    "line": 12,
-                    "column": 13,
-                    "children": []
-                  },
-                  {
-                    "type": "OF",
-                    "value": "of",
-                    "line": 12,
-                    "column": 16,
-                    "children": []
-                  },
-                  {
-                    "type": "TYPE",
-                    "value": "type",
-                    "line": 12,
-                    "column": 21,
-                    "children": []
-                  },
-                  {
-                    "type": "DOUBLE",
-                    "value": "double",
-                    "line": 12,
-                    "column": 28,
-                    "children": []
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            "type": "BEGIN",
-            "value": "begin",
-            "line": 13,
-            "column": 6,
-            "children": []
-          },
-          {
-            "type": "STATEMENTS",
-            "value": null,
-            "line": 0,
-            "column": 0,
-            "children": [
-              {
-                "type": "STATEMENT",
-                "value": "DISPLAY",
-                "line": 0,
-                "column": 0,
-                "children": [
-                  {
-                    "type": "DISPLAY",
-                    "value": "display",
-                    "line": 14,
-                    "column": 12,
-                    "children": []
-                  },
-                  {
-                    "type": "STRING",
-                    "value": "Welcome to the world of SCL",
-                    "line": 14,
-                    "column": 42,
-                    "children": []
-                  }
-                ]
-              },
-              {
-                "type": "STATEMENT",
-                "value": "SET",
-                "line": 0,
-                "column": 0,
-                "children": [
-                  {
-                    "type": "SET",
-                    "value": "set",
-                    "line": 15,
-                    "column": 8,
-                    "children": []
-                  },
-                  {
-                    "type": "IDENTIFIER",
-                    "value": "x",
-                    "line": 15,
+                    "type": "VARIABLES",
+                    "value": "variables",
+                    "line": 11,
                     "column": 10,
                     "children": []
                   },
                   {
-                    "type": "ASSIGN",
-                    "value": "=",
-                    "line": 15,
-                    "column": 12,
-                    "children": []
-                  },
-                  {
-                    "type": "FLOAT_NUMBER",
-                    "value": "45.95",
-                    "line": 15,
-                    "column": 18,
-                    "children": []
+                    "type": "VARIABLE_DEFINE",
+                    "value": null,
+                    "line": 0,
+                    "column": 0,
+                    "children": [
+                      {
+                        "type": "DEFINE",
+                        "value": "define",
+                        "line": 12,
+                        "column": 11,
+                        "children": []
+                      },
+                      {
+                        "type": "IDENTIFIER",
+                        "value": "x",
+                        "line": 12,
+                        "column": 13,
+                        "children": []
+                      },
+                      {
+                        "type": "OF",
+                        "value": "of",
+                        "line": 12,
+                        "column": 16,
+                        "children": []
+                      },
+                      {
+                        "type": "TYPE",
+                        "value": "type",
+                        "line": 12,
+                        "column": 21,
+                        "children": []
+                      },
+                      {
+                        "type": "DOUBLE",
+                        "value": "double",
+                        "line": 12,
+                        "column": 28,
+                        "children": []
+                      }
+                    ]
                   }
                 ]
               },
               {
-                "type": "STATEMENT",
-                "value": "DISPLAY",
+                "type": "BEGIN",
+                "value": "begin",
+                "line": 13,
+                "column": 6,
+                "children": []
+              },
+              {
+                "type": "STATEMENTS",
+                "value": null,
                 "line": 0,
                 "column": 0,
                 "children": [
                   {
-                    "type": "DISPLAY",
-                    "value": "display",
-                    "line": 16,
-                    "column": 12,
-                    "children": []
+                    "type": "STATEMENT",
+                    "value": "DISPLAY",
+                    "line": 0,
+                    "column": 0,
+                    "children": [
+                      {
+                        "type": "DISPLAY",
+                        "value": "display",
+                        "line": 14,
+                        "column": 12,
+                        "children": []
+                      },
+                      {
+                        "type": "STRING",
+                        "value": "Welcome to the world of SCL",
+                        "line": 14,
+                        "column": 42,
+                        "children": []
+                      }
+                    ]
                   },
                   {
-                    "type": "STRING",
-                    "value": "Value of x: ",
-                    "line": 16,
-                    "column": 27,
-                    "children": []
+                    "type": "STATEMENT",
+                    "value": "SET",
+                    "line": 0,
+                    "column": 0,
+                    "children": [
+                      {
+                        "type": "SET",
+                        "value": "set",
+                        "line": 15,
+                        "column": 8,
+                        "children": []
+                      },
+                      {
+                        "type": "IDENTIFIER",
+                        "value": "x",
+                        "line": 15,
+                        "column": 10,
+                        "children": []
+                      },
+                      {
+                        "type": "ASSIGN",
+                        "value": "=",
+                        "line": 15,
+                        "column": 12,
+                        "children": []
+                      },
+                      {
+                        "type": "FLOAT_NUMBER",
+                        "value": "45.95",
+                        "line": 15,
+                        "column": 18,
+                        "children": []
+                      }
+                    ]
                   },
                   {
-                    "type": "COMMA",
-                    "value": ",",
-                    "line": 16,
-                    "column": 28,
-                    "children": []
+                    "type": "STATEMENT",
+                    "value": "DISPLAY",
+                    "line": 0,
+                    "column": 0,
+                    "children": [
+                      {
+                        "type": "DISPLAY",
+                        "value": "display",
+                        "line": 16,
+                        "column": 12,
+                        "children": []
+                      },
+                      {
+                        "type": "STRING",
+                        "value": "Value of x: ",
+                        "line": 16,
+                        "column": 27,
+                        "children": []
+                      },
+                      {
+                        "type": "COMMA",
+                        "value": ",",
+                        "line": 16,
+                        "column": 28,
+                        "children": []
+                      },
+                      {
+                        "type": "IDENTIFIER",
+                        "value": "x",
+                        "line": 16,
+                        "column": 30,
+                        "children": []
+                      }
+                    ]
                   },
                   {
-                    "type": "IDENTIFIER",
-                    "value": "x",
-                    "line": 16,
-                    "column": 30,
-                    "children": []
+                    "type": "STATEMENT",
+                    "value": "EXIT",
+                    "line": 0,
+                    "column": 0,
+                    "children": [
+                      {
+                        "type": "EXIT",
+                        "value": "exit",
+                        "line": 17,
+                        "column": 9,
+                        "children": []
+                      }
+                    ]
                   }
                 ]
               },
               {
-                "type": "STATEMENT",
-                "value": "EXIT",
-                "line": 0,
-                "column": 0,
-                "children": [
-                  {
-                    "type": "EXIT",
-                    "value": "exit",
-                    "line": 17,
-                    "column": 9,
-                    "children": []
-                  }
-                ]
+                "type": "ENDFUN",
+                "value": "endfun",
+                "line": 18,
+                "column": 7,
+                "children": []
+              },
+              {
+                "type": "IDENTIFIER",
+                "value": "main",
+                "line": 18,
+                "column": 12,
+                "children": []
               }
             ]
-          },
-          {
-            "type": "ENDFUN",
-            "value": "endfun",
-            "line": 18,
-            "column": 7,
-            "children": []
-          },
-          {
-            "type": "IDENTIFIER",
-            "value": "main",
-            "line": 18,
-            "column": 12,
-            "children": []
           }
         ]
       }
     ]
   },
   "symbol_table": [
-    "x",
-    "main"
+    "main",
+    "x"
   ],
   "success": true,
   "errors": [],
