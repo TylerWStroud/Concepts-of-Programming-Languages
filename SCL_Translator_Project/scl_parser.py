@@ -218,7 +218,7 @@ class SCLParser:
         return True
     
     def _function_definition(self, parent_node):
-        # function_definition => FUNCTION IDENTIFIER RETURN TYPE type IS variables? BEGIN statements ENDFUN IDENTIFIER
+        # function_definition => FUNCTION IDENTIFIER RETURN (pointer)? TYPE type (IS variables? structures? statements? ENDFUN IDENTIFIER)?
         print(DebugMessages.PARSING_FUNCTION)
         
         if not self._match("FUNCTION", parent_node):
@@ -234,51 +234,62 @@ class SCLParser:
         if not self._match("RETURN", parent_node):
             return False
         
+        # Optional pointer keyword
+        if self._current_token()["type"] == "IDENTIFIER" and self._current_token()["value"] == "pointer":
+            self._match("IDENTIFIER", parent_node)
+        
         if not self._match("TYPE", parent_node):
             return False
         
-        # Actual type (INTEGER, DOUBLE, etc.)
+        # Actual type (INTEGER, DOUBLE, IDENTIFIER, etc.)
         type_token = self._current_token()
-        if type_token["type"] not in VALID_TYPES:
+        if type_token["type"] not in VALID_TYPES and type_token["type"] != "IDENTIFIER":
             self.errors.append(ErrorMessages.EXPECTED_TYPE.format(found_type=type_token['type']))
             return False
         self._match(type_token["type"], parent_node)
         
-        if not self._match("IS", parent_node):
-            return False
+        # Parameters (optional)
+        if self._current_token()["type"] == "PARAMETERS":
+            parameters_node = ParseTreeNode("PARAMETERS")
+            if self._function_parameters(parameters_node):
+                parent_node.add_child(parameters_node)
         
-        # Variables section (optional)
-        if self._current_token()["type"] == "VARIABLES":
-            variables_node = ParseTreeNode("VARIABLES_SECTION")
-            if self._variables_section(variables_node):
-                parent_node.add_child(variables_node)
-        
-        # Structures section (optional)
-        if self._current_token()["type"] == "STRUCTURES":
-            structures_node = ParseTreeNode("STRUCTURES_SECTION")
-            if self._structures_section(structures_node):
-                parent_node.add_child(structures_node)
-        
-        # BEGIN section
-        if not self._match("BEGIN", parent_node):
-            return False
-        
-        # Statements
-        statements_node = ParseTreeNode("STATEMENTS")
-        if self._statements(statements_node):
-            parent_node.add_child(statements_node)
-        
-        # ENDFUN
-        if not self._match("ENDFUN", parent_node):
-            return False
-        
-        # Function name (again)
-        if not self._match("IDENTIFIER", parent_node):
-            return False
-        
-        endfun_name = self._previous_token()["value"]
-        if endfun_name != func_name:
-            self.errors.append(ErrorMessages.FUNCTION_NAME_MISMATCH.format(start_name=func_name, end_name=endfun_name))
+        # Check if this is a full function definition (has IS) or just a declaration
+        if self._current_token()["type"] == "IS":
+            self._match("IS", parent_node)
+            
+            # Variables section (optional)
+            if self._current_token()["type"] == "VARIABLES":
+                variables_node = ParseTreeNode("VARIABLES_SECTION")
+                if self._variables_section(variables_node):
+                    parent_node.add_child(variables_node)
+            
+            # Structures section (optional)
+            if self._current_token()["type"] == "STRUCTURES":
+                structures_node = ParseTreeNode("STRUCTURES_SECTION")
+                if self._structures_section(structures_node):
+                    parent_node.add_child(structures_node)
+            
+            # BEGIN section (optional)
+            if self._current_token()["type"] == "BEGIN":
+                self._match("BEGIN", parent_node)
+                
+                # Statements
+                statements_node = ParseTreeNode("STATEMENTS")
+                if self._statements(statements_node):
+                    parent_node.add_child(statements_node)
+            
+            # ENDFUN
+            if not self._match("ENDFUN", parent_node):
+                return False
+            
+            # Function name (again)
+            if not self._match("IDENTIFIER", parent_node):
+                return False
+            
+            endfun_name = self._previous_token()["value"]
+            if endfun_name != func_name:
+                self.errors.append(ErrorMessages.FUNCTION_NAME_MISMATCH.format(start_name=func_name, end_name=endfun_name))
         
         return True
     
@@ -353,7 +364,7 @@ class SCLParser:
         print(DebugMessages.PARSING_STATEMENTS)
         
         statement_count = 0
-        while self._current_token()["type"] in ["DISPLAY", "SET", "CALL", "CREATE", "DESTROY", "RETURN", "EXIT"]:
+        while self._current_token()["type"] in ["DISPLAY", "SET", "CALL", "CREATE", "DESTROY", "RETURN", "IF", "FOR", "EXIT"]:
             stmt_type = self._current_token()["type"]
             stmt_node = ParseTreeNode("STATEMENT", value=stmt_type)
             
@@ -369,6 +380,10 @@ class SCLParser:
                 success = self._destroy_statement(stmt_node)
             elif stmt_type == "RETURN":
                 success = self._return_statement(stmt_node)
+            elif stmt_type == "IF":
+                success = self._if_statement(stmt_node)
+            elif stmt_type == "FOR":
+                success = self._for_statement(stmt_node)
             elif stmt_type == "EXIT":
                 success = self._exit_statement(stmt_node)
             else:
@@ -585,6 +600,67 @@ class SCLParser:
         
         return True
     
+    def _if_statement(self, parent_node):
+        # if_statement => IF expression THEN statements? ENDIF
+        print("Parsing if statement...")
+        
+        if not self._match("IF", parent_node):
+            return False
+        
+        # Parse condition (simplified - just consume until THEN)
+        while self._current_token()["type"] != "THEN" and not self.is_at_end():
+            self._advance()
+        
+        if not self._match("THEN", parent_node):
+            return False
+        
+        # Parse statements (optional)
+        if self._current_token()["type"] in ["DISPLAY", "SET", "CALL", "CREATE", "DESTROY", "RETURN", "IF", "FOR", "EXIT"]:
+            statements_node = ParseTreeNode("STATEMENTS")
+            if self._statements(statements_node):
+                parent_node.add_child(statements_node)
+        
+        if not self._match("ENDIF", parent_node):
+            return False
+        
+        return True
+    
+    def _for_statement(self, parent_node):
+        # for_statement => FOR IDENTIFIER ASSIGN NUMBER TO expression LOOP statements ENDFOR
+        print("Parsing for statement...")
+        
+        if not self._match("FOR", parent_node):
+            return False
+        
+        if not self._match("IDENTIFIER", parent_node):
+            return False
+        
+        if not self._match("ASSIGN", parent_node):
+            return False
+        
+        if not self._match("NUMBER", parent_node):
+            return False
+        
+        if not self._match("TO", parent_node):
+            return False
+        
+        # Parse expression (simplified - just consume until LOOP)
+        while self._current_token()["type"] != "LOOP" and not self.is_at_end():
+            self._advance()
+        
+        if not self._match("LOOP", parent_node):
+            return False
+        
+        # Parse statements
+        statements_node = ParseTreeNode("STATEMENTS")
+        if self._statements(statements_node):
+            parent_node.add_child(statements_node)
+        
+        if not self._match("ENDFOR", parent_node):
+            return False
+        
+        return True
+    
     def _struct_definition(self, parent_node):
         """struct_definition → STRUCT IDENTIFIER IS variables? ENDSTRUCT IDENTIFIER"""
         print("Parsing struct definition...")
@@ -709,9 +785,15 @@ class SCLParser:
         if not self._match("PARAMETERS", parent_node):
             return False
         
-        # Parse parameter list (simplified for now)
-        while (self._current_token()["type"] not in ["FUNCTION", "IMPLEMENTATIONS", "EOF"] and
-               self._current_token()["type"] != "IS"):
+        # Parse parameter list - consume until we hit IS, FUNCTION, or EOF
+        while (self._current_token()["type"] not in ["FUNCTION", "IMPLEMENTATIONS", "EOF", "IS"] and
+               not self.is_at_end()):
+            # Add parameter tokens to the parse tree
+            token = self._current_token()
+            param_node = ParseTreeNode("PARAMETER_TOKEN", value=token["value"])
+            param_node.line = token.get("line", 0)
+            param_node.column = token.get("column", 0)
+            parent_node.add_child(param_node)
             self._advance()
         
         return True

@@ -162,7 +162,7 @@ begin
 endfun display_data
 
 //
-function traverse_display return type typee  parameters plist pointer of type listT is
+function traverse_display return type void parameters plist pointer of type listT is
 variables   
    define i of type integer
 structures
