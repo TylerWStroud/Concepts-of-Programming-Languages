@@ -1,6 +1,26 @@
 '''
 SCL Language Parser
-Complete Parser implementation for SCL language subset
+
+Complete recursive descent parser implementation for the SCL (Simple C-Like) language subset.
+This parser implements a top-down parsing strategy using recursive descent with predictive parsing.
+
+Key Features:
+- Recursive descent parsing with error recovery
+- Symbol table management for identifier tracking
+- Parse tree generation with full AST support
+- Comprehensive error reporting with line/column information
+- Support for SCL grammar including functions, variables, structures, and control flow
+
+Grammar Support:
+- Program structure: imports, specifications, forward declarations, implementations
+- Function definitions with parameters and return types
+- Variable declarations with type checking
+- Control flow: if statements, for loops, function calls
+- Data structures: struct definitions, array declarations, pointer types
+- Statements: display, set, call, create, destroy, return, exit
+
+Author: SCL Translator Project
+Version: 1.0
 '''
 
 import json
@@ -11,6 +31,20 @@ from scl_constants import VALID_TYPES, ErrorMessages, DebugMessages
 
 @dataclass
 class ParseTreeNode:
+    """
+    Represents a node in the Abstract Syntax Tree (AST) for the SCL parser.
+    
+    This class encapsulates the hierarchical structure of parsed SCL code,
+    storing both syntactic information (type, value) and source location data
+    (line, column) for comprehensive error reporting and code analysis.
+    
+    Attributes:
+        type (str): The grammatical type of this node (e.g., 'PROGRAM', 'FUNCTION_DEFINITION')
+        value (Any): The actual value/content of this node (e.g., identifier name, literal value)
+        children (List[Any]): Child nodes in the parse tree hierarchy
+        line (int): Source code line number for error reporting
+        column (int): Source code column number for precise error location
+    """
     type: str
     value: Any = None
     children: List[Any] = None
@@ -18,13 +52,24 @@ class ParseTreeNode:
     column: int = 0
     
     def __post_init__(self):
+        # Initialize empty children list if not provided to prevent mutable default argument issues.
         if self.children is None:
             self.children = []
     
     def add_child(self, child):
+        # Add a child node to this parse tree node for building the AST hierarchy.
         self.children.append(child)
     
     def to_dict(self):
+        """
+        Convert the parse tree node to a dictionary representation for JSON serialization.
+        
+        This method recursively converts the entire subtree to a dictionary format,
+        enabling easy serialization and external tool integration.
+        
+        Returns:
+            dict: Dictionary representation of the parse tree node and all children
+        """
         return {
             "type": self.type,
             "value": self.value,
@@ -35,17 +80,67 @@ class ParseTreeNode:
         }
 
 class SCLParser:
+    """
+    Recursive Descent Parser for the SCL (Simple C-Like) Language
+    
+    This parser implements a predictive recursive descent parsing algorithm for the SCL language.
+    It processes tokens sequentially, building an Abstract Syntax Tree (AST) while performing
+    semantic analysis including symbol table management and type checking.
+    
+    Parsing Strategy:
+    - Top-down recursive descent with predictive parsing
+    - Error recovery mechanisms to continue parsing after errors
+    - Symbol table tracking for identifier declaration/usage validation
+    - Parse tree construction for AST generation
+    
+    Error Handling:
+    - Collects multiple errors rather than stopping at first error
+    - Provides detailed error messages with line/column information
+    - Implements error recovery to parse as much as possible
+    
+    Attributes:
+        tokens (List[Dict]): List of tokens from the scanner
+        current (int): Index of the current token being processed
+        symbol_table (Set[str]): Set of declared identifiers for scope checking
+        parse_tree (ParseTreeNode): Root node of the generated parse tree
+        errors (List[str]): Collection of parsing errors encountered
+    """
+    
     def __init__(self, tokens_data: Dict[str, Any]):
-        self.tokens = tokens_data["tokens"]
-        self.current = 0
-        self.symbol_table = set()
-        self.parse_tree = None
-        self.errors = []
+        """
+        Initialize the SCL parser with tokenized input.
+        
+        Args:
+            tokens_data (Dict[str, Any]): Dictionary containing 'tokens' key with list of token dictionaries.
+                                        Each token should have 'type', 'value', 'line', and 'column' fields.
+        """
+        self.tokens = tokens_data["tokens"]           # Token stream from scanner
+        self.current = 0                              # Current position in token stream
+        self.symbol_table = set()                     # Tracks declared identifiers
+        self.parse_tree = None                        # Root of the AST
+        self.errors = []                              # Accumulates parsing errors
+        
+        # ERROR HANDLING STRATEGY:
+        # - Collect multiple errors rather than stopping at first error (error recovery)
+        # - Continue parsing after errors to find as many issues as possible
+        # - Provide detailed error messages with line/column information when available
+        # - Use lenient symbol table management to reduce cascading undeclared identifier errors
+        # - Implement predictive parsing with appropriate error messages for expected tokens
     
     # ========== REQUIRED PUBLIC FUNCTIONS ==========
+    # These methods provide the external interface required by the SCL language specification
     
     def getNextToken(self):
-        # Returns the next token that is not a comment
+        """
+        Retrieve and consume the next token from the input stream.
+        
+        This method advances the parser's position and returns the current token.
+        It's part of the required public interface for the SCL parser specification.
+        
+        Returns:
+            Dict[str, Any]: The next token with 'type', 'value', 'line', and 'column' fields.
+                           Returns EOF token when no more tokens are available.
+        """
         if self.current < len(self.tokens):
             token = self._current_token()
             self._advance()  # Move to next token for subsequent calls
@@ -53,20 +148,58 @@ class SCLParser:
         return {"type": "EOF", "value": "", "line": 0, "column": 0}
     
     def identifierExists(self, identifier: str) -> bool:
-        # Returns true if an identifier has already been declared
+        """
+        Check if an identifier has been declared in the current scope.
+        
+        This method provides symbol table lookup functionality required by the SCL
+        parser specification for semantic analysis and error checking.
+        
+        Args:
+            identifier (str): The identifier name to check for declaration
+            
+        Returns:
+            bool: True if identifier has been declared, False otherwise
+        """
         return identifier in self.symbol_table
     
     def begin(self):
-        # Calls the private start() function
+        """
+        Start the parsing process from the root grammar rule.
+        
+        This is the main entry point for parsing that initiates the recursive descent
+        parsing process starting from the 'program' nonterminal. Required by the SCL
+        parser specification as the primary parsing interface.
+        
+        Returns:
+            Dict[str, Any]: Parsing results including parse tree, symbol table, 
+                           success status, errors, and statistics
+        """
         return self._start()
     
     # ========== PRIVATE FUNCTIONS ==========
+    # Internal methods for parser implementation and token stream management
     
     def _start(self):
-        # First nonterminal in the grammar subset
+        """
+        Initialize parsing and invoke the root grammar rule.
+        
+        This method sets up the parse tree root node and begins recursive descent
+        parsing from the 'program' nonterminal. It also packages the final parsing
+        results for return to the caller.
+        
+        Returns:
+            Dict[str, Any]: Complete parsing results including:
+                - parse_tree: Dictionary representation of the AST
+                - symbol_table: List of all declared identifiers
+                - success: Boolean indicating if parsing completed without errors
+                - errors: List of error messages encountered
+                - tokens_processed: Number of tokens successfully processed
+        """
+        # Create root node for the Abstract Syntax Tree
         self.parse_tree = ParseTreeNode("PROGRAM")
         success = self._program(self.parse_tree)
         
+        # Package results for external consumption
         result = {
             "parse_tree": self.parse_tree.to_dict(),
             "symbol_table": list(self.symbol_table),
@@ -78,31 +211,85 @@ class SCLParser:
         return result
     
     def _current_token(self):
+        """
+        Get the token at the current parser position without advancing.
+        
+        Returns:
+            Dict[str, Any]: Current token or EOF token if at end of stream
+        """
         if self.current >= len(self.tokens):
             return {"type": "EOF", "value": "", "line": 0, "column": 0}
         return self.tokens[self.current]
     
     def _advance(self):
+        """
+        Move to the next token in the input stream.
+        
+        Returns:
+            Dict[str, Any]: The previous token (the one we just moved past)
+        """
         if self.current < len(self.tokens):
             self.current += 1
         return self._previous_token()
     
     def _previous_token(self):
+        """
+        Get the token that was just processed (one position behind current).
+        
+        Useful for extracting information from tokens that were just matched.
+        
+        Returns:
+            Dict[str, Any]: Previous token or first token if at beginning
+        """
         if self.current == 0:
             return self.tokens[0] if self.tokens else {"type": "EOF", "value": ""}
         return self.tokens[self.current - 1]
     
     def peek_next(self):
+        """
+        Look ahead one token without advancing the parser position.
+        
+        Used for predictive parsing decisions where we need to see what's coming next.
+        
+        Returns:
+            Dict[str, Any]: Next token or EOF if at end of stream
+        """
         if self.current + 1 >= len(self.tokens):
             return {"type": "EOF", "value": "", "line": 0, "column": 0}
         return self.tokens[self.current + 1]
     
     def is_at_end(self):
+        """
+        Check if we've reached the end of the token stream.
+        
+        Returns:
+            bool: True if no more tokens to process, False otherwise
+        """
         return self.current >= len(self.tokens)
     
     def _match(self, expected_type: str, parent_node=None):
+        """
+        Attempt to match the current token with an expected token type.
+        
+        This is the core parsing primitive that implements the token matching mechanism
+        for recursive descent parsing. It checks if the current token matches the expected
+        type, and if so, optionally adds it to the parse tree and advances the parser.
+        
+        Args:
+            expected_type (str): The token type we expect to see (e.g., 'IDENTIFIER', 'FUNCTION')
+            parent_node (ParseTreeNode, optional): Parent node to add matched token to in parse tree
+            
+        Returns:
+            bool: True if token matched successfully, False if mismatch occurred
+            
+        Side Effects:
+            - Advances parser position if match successful
+            - Adds token to parse tree if parent_node provided
+            - Adds error message to error list if match fails
+        """
         token = self._current_token()
         if token["type"] == expected_type:
+            # Match successful - add to parse tree if requested
             if parent_node is not None:
                 parent_node.add_child(ParseTreeNode(
                     type=expected_type,
@@ -110,45 +297,62 @@ class SCLParser:
                     line=token.get("line", 0),
                     column=token.get("column", 0)
                 ))
-            self._advance()
+            self._advance()  # Consume the matched token
             return True
         else:
+            # Match failed - record error with location information
             error_msg = f"Expected {expected_type}, found {token['type']} at line {token.get('line', 'unknown')}"
             self.errors.append(error_msg)
             return False
     
     # ========== GRAMMAR RULES (PRIVATE) ==========
+    # These methods implement the SCL grammar productions using recursive descent parsing
     
     def _program(self, parent_node):
-        # """program → import* specifications? forward_declarations? implementations function_definitions"""
+        """
+        Parse the root 'program' nonterminal according to SCL grammar.
+        
+        Grammar Rule: program → import* specifications? forward_declarations? implementations function_definitions
+        
+        This is the top-level grammar rule that defines the overall structure of an SCL program.
+        It handles the main sections in order: imports, specifications, forward declarations,
+        implementations, and function definitions. Most sections are optional except implementations
+        and function definitions which are required.
+        
+        Args:
+            parent_node (ParseTreeNode): The parent node to attach parsed elements to
+            
+        Returns:
+            bool: True if program structure parsed successfully, False if critical errors occurred
+        """
         print(DebugMessages.PARSING_PROGRAM)
         
-        # Parse import statements (multiple)
+        # Parse import statements (zero or more) - handle external dependencies
         while self._current_token()["type"] == "IMPORT":
             import_node = ParseTreeNode("IMPORT_STATEMENT")
             if self._import_statement(import_node):
                 parent_node.add_child(import_node)
             else:
-                break
+                break  # Stop on first import parsing failure
         
-        # Parse specifications section (optional)
+        # Parse specifications section (optional) - type and struct definitions
         if self._current_token()["type"] == "SPECIFICATIONS":
             specs_node = ParseTreeNode("SPECIFICATIONS_SECTION")
             if self._specifications_section(specs_node):
                 parent_node.add_child(specs_node)
         
-        # Parse forward declarations (optional)
+        # Parse forward declarations (optional) - function signatures
         if self._current_token()["type"] == "FORWARD":
             forward_node = ParseTreeNode("FORWARD_DECLARATIONS")
             if self._forward_declarations(forward_node):
                 parent_node.add_child(forward_node)
         
-        # Parse implementations section
+        # Parse implementations section (required) - marks start of implementation code
         if not self._match("IMPLEMENTATIONS", parent_node):
             self.errors.append(ErrorMessages.EXPECTED_IMPLEMENTATIONS)
             return False
         
-        # Parse function definitions (multiple)
+        # Parse function definitions (required) - the actual program logic
         functions_node = ParseTreeNode("FUNCTION_DEFINITIONS")
         success = self._function_definitions(functions_node)
         parent_node.add_child(functions_node)
@@ -156,7 +360,21 @@ class SCLParser:
         return success
     
     def _import_statement(self, parent_node):
-        """import → IMPORT (STRING | ANGLE_BRACKET_STRING)"""
+        """
+        Parse import statement for external file inclusion.
+        
+        Grammar Rule: import → IMPORT (STRING | ANGLE_BRACKET_STRING)
+        
+        Handles SCL import statements that include external files or libraries.
+        Supports both quoted strings ("filename.h") and angle bracket notation (<filename.h>).
+        This is a simplified implementation that consumes tokens until the import ends.
+        
+        Args:
+            parent_node (ParseTreeNode): Parent node to attach import statement to
+            
+        Returns:
+            bool: True if import statement parsed successfully, False otherwise
+        """
         print(DebugMessages.PARSING_IMPORT)
         
         if not self._match("IMPORT", parent_node):
@@ -164,12 +382,14 @@ class SCLParser:
         
         token = self._current_token()
         if token["type"] in ["STRING", "LESS_THAN"]:
-            # For now, just consume the import content
+            # Consume import content until we reach a section boundary or file extension
+            # This is a simplified approach that handles most common import patterns
             while (self._current_token()["type"] not in ["IMPORT", "SPECIFICATIONS", 
                                                         "FORWARD", "IMPLEMENTATIONS", "EOF"] and
                 not self._current_token()["value"].endswith(('.h', '>'))):
                 self._advance()
-            # Consume the final token (either .h or >)
+            
+            # Consume the final token (either .h extension or closing >)
             if self._current_token()["type"] not in ["IMPORT", "SPECIFICATIONS", 
                                                     "FORWARD", "IMPLEMENTATIONS", "EOF"]:
                 self._advance()
@@ -218,17 +438,36 @@ class SCLParser:
         return True
     
     def _function_definition(self, parent_node):
-        # function_definition => FUNCTION IDENTIFIER RETURN (pointer)? TYPE type (IS variables? structures? statements? ENDFUN IDENTIFIER)?
+        """
+        Parse a complete function definition including signature and body.
+        
+        Grammar Rule: function_definition → FUNCTION IDENTIFIER RETURN (pointer)? TYPE type 
+                                          (IS variables? structures? statements? ENDFUN IDENTIFIER)?
+        
+        This method handles both function declarations (signature only) and full function 
+        definitions (with implementation body). It performs semantic analysis including:
+        - Function name registration in symbol table
+        - Return type validation
+        - Parameter processing
+        - Function body parsing (variables, structures, statements)
+        - Function name matching validation between FUNCTION and ENDFUN
+        
+        Args:
+            parent_node (ParseTreeNode): Parent node to attach function definition to
+            
+        Returns:
+            bool: True if function parsed successfully, False if errors occurred
+        """
         print(DebugMessages.PARSING_FUNCTION)
         
         if not self._match("FUNCTION", parent_node):
             return False
         
-        # Function name
+        # Function name - must be a valid identifier
         if not self._match("IDENTIFIER", parent_node):
             return False
         func_name = self._previous_token()["value"]
-        self.symbol_table.add(func_name)
+        self.symbol_table.add(func_name)  # Register function in symbol table
         
         # Return type
         if not self._match("RETURN", parent_node):
@@ -311,28 +550,49 @@ class SCLParser:
         return True
     
     def _define_statement(self, parent_node):
-        # define_statement => DEFINE IDENTIFIER (ARRAY [size] OF)? TYPE type
+        """
+        Parse variable definition statements with type checking.
+        
+        Grammar Rule: define_statement → DEFINE IDENTIFIER (ARRAY [size] OF)? TYPE type
+        
+        Handles variable declarations including:
+        - Simple variable definitions: DEFINE x TYPE INTEGER
+        - Array declarations: DEFINE arr ARRAY [10] OF TYPE INTEGER  
+        - Pointer declarations: DEFINE ptr pointer OF TYPE INTEGER
+        - User-defined type variables: DEFINE obj TYPE MyStruct
+        
+        Performs semantic analysis by:
+        - Adding variable names to symbol table
+        - Validating type specifications
+        - Checking array size syntax
+        
+        Args:
+            parent_node (ParseTreeNode): Parent node to attach variable definition to
+            
+        Returns:
+            bool: True if variable definition parsed successfully, False otherwise
+        """
         print(DebugMessages.PARSING_DEFINE)
         
         if not self._match("DEFINE", parent_node):
             return False
         
-        # Variable name
+        # Variable name - must be valid identifier
         if not self._match("IDENTIFIER", parent_node):
             return False
         var_name = self._previous_token()["value"]
-        self.symbol_table.add(var_name)
+        self.symbol_table.add(var_name)  # Register variable in symbol table
         
-        # Check if it's an array declaration
+        # Handle array declaration syntax: ARRAY [size] OF TYPE type
         if self._current_token()["type"] == "ARRAY":
-            # Parse array declaration: ARRAY [size] OF TYPE type
             if not self._match("ARRAY", parent_node):
                 return False
             
-            # Array size in brackets
+            # Parse array size specification in square brackets [n]
             if not self._match("LBRACKET", parent_node):
                 return False
             
+            # Array size must be a numeric literal
             if not self._match("NUMBER", parent_node):
                 return False
             
@@ -360,10 +620,34 @@ class SCLParser:
         return True
     
     def _statements(self, parent_node):
-        # statements => (display_statement | set_statement | call_statement | create_statement | destroy_statement | exit_statement)+
+        """
+        Parse a sequence of executable statements.
+        
+        Grammar Rule: statements → (display_statement | set_statement | call_statement | 
+                                     create_statement | destroy_statement | return_statement |
+                                     if_statement | for_statement | exit_statement)+
+        
+        This method handles the main executable content of functions, parsing various
+        statement types including:
+        - DISPLAY: Output statements for printing values
+        - SET: Assignment statements for variable modification
+        - CALL: Function call statements
+        - CREATE/DESTROY: Dynamic memory management
+        - RETURN: Function return statements
+        - IF: Conditional execution statements
+        - FOR: Loop statements
+        - EXIT: Program termination statements
+        
+        Args:
+            parent_node (ParseTreeNode): Parent node to attach statements to
+            
+        Returns:
+            bool: True if at least one statement parsed successfully, False if no statements found
+        """
         print(DebugMessages.PARSING_STATEMENTS)
         
         statement_count = 0
+        # Parse statements until we encounter a non-statement token
         while self._current_token()["type"] in ["DISPLAY", "SET", "CALL", "CREATE", "DESTROY", "RETURN", "IF", "FOR", "EXIT"]:
             stmt_type = self._current_token()["type"]
             stmt_node = ParseTreeNode("STATEMENT", value=stmt_type)
@@ -426,13 +710,30 @@ class SCLParser:
         return True
     
     def _display_statement(self, parent_node):
-        # display_statement => DISPLAY (STRING | IDENTIFIER) (COMMA (STRING | IDENTIFIER))*
+        """
+        Parse output/print statements for displaying values.
+        
+        Grammar Rule: display_statement → DISPLAY (STRING | IDENTIFIER) (COMMA (STRING | IDENTIFIER))*
+        
+        Handles output statements that can display:
+        - String literals: DISPLAY "Hello World"
+        - Variable values: DISPLAY myVariable
+        - Multiple items: DISPLAY "Value:", myVariable, "End"
+        
+        This is SCL's primary output mechanism, similar to print statements in other languages.
+        
+        Args:
+            parent_node (ParseTreeNode): Parent node to attach display statement to
+            
+        Returns:
+            bool: True if display statement parsed successfully, False otherwise
+        """
         print(DebugMessages.PARSING_DISPLAY)
         
         if not self._match("DISPLAY", parent_node):
             return False
         
-        # First display item (required)
+        # Parse first display item (required) - must be string literal or identifier
         token = self._current_token()
         if token["type"] not in ["STRING", "IDENTIFIER"]:
             self.errors.append(ErrorMessages.EXPECTED_STRING_OR_IDENTIFIER.format(found_type=token['type']))
@@ -451,70 +752,94 @@ class SCLParser:
         return True
     
     def _set_statement(self, parent_node):
-        # set_statement => SET IDENTIFIER ASSIGN expression
+        """
+        Parse assignment statements for variable modification.
+        
+        Grammar Rule: set_statement → SET IDENTIFIER ASSIGN expression
+        
+        Handles various forms of assignment including:
+        - Simple assignment: SET x ASSIGN 5
+        - Pointer dereferencing: SET ptr->field ASSIGN value
+        - Function call assignment: SET result ASSIGN functionCall(params)
+        - Address assignment: SET ptr ASSIGN ADDRESS variable
+        
+        Performs semantic analysis by:
+        - Checking if assigned variables are declared
+        - Validating assignment syntax
+        - Handling complex expressions on right-hand side
+        
+        Args:
+            parent_node (ParseTreeNode): Parent node to attach set statement to
+            
+        Returns:
+            bool: True if assignment parsed successfully, False otherwise
+        """
         print(DebugMessages.PARSING_SET)
         
         if not self._match("SET", parent_node):
             return False
         
-        # Handle left side of assignment (can be identifier or pointer dereference)
+        # Parse left-hand side of assignment (l-value)
         if not self._match("IDENTIFIER", parent_node):
             return False
         
         var_name = self._previous_token()["value"]
-        # Check if variable is declared (using the public function)
+        # Semantic check: verify variable has been declared
         if not self.identifierExists(var_name):
             self.errors.append(ErrorMessages.VARIABLE_NOT_DECLARED.format(var_name=var_name, context="SET statement"))
         
-        # Handle pointer dereferencing on left side (e.g., nodePtr->field)
+        # Handle pointer member access on left side (e.g., nodePtr->field)
         if self._current_token()["type"] == "ARROW":
             self._match("ARROW", parent_node)
             if not self._match("IDENTIFIER", parent_node):
                 return False
         
+        # Parse assignment operator
         if not self._match("ASSIGN", parent_node):
             return False
         
-        # Handle address operator - simple fix
+        # Handle address-of operator on right side (e.g., SET ptr ASSIGN ADDRESS var)
         if self._current_token()["type"] == "ADDRESS":
             self._match("ADDRESS", parent_node)
             if not self._match("IDENTIFIER", parent_node):
                 return False
-            return True
+            return True  # Address assignment is complete
         
         # Handle function calls, pointer dereferencing, and simple expressions
         token = self._current_token()
         if token["type"] == "IDENTIFIER":
-            # Check if it's a function call (next token is LPAREN)
+            # Use lookahead to distinguish function calls from simple identifiers
             if self.peek_next()["type"] == "LPAREN":
-                # It's a function call - consume the function name and parameters
+                # Function call assignment: SET result ASSIGN functionName(params)
                 self._match("IDENTIFIER", parent_node)
                 self._match("LPAREN", parent_node)
                 
-                # Consume parameters until closing parenthesis
+                # Parse function parameters using parentheses balancing
+                # This handles nested function calls and complex parameter expressions
                 paren_count = 1
                 while paren_count > 0 and not self.is_at_end():
                     if self._current_token()["type"] == "LPAREN":
-                        paren_count += 1
+                        paren_count += 1  # Track nested parentheses
                     elif self._current_token()["type"] == "RPAREN":
-                        paren_count -= 1
+                        paren_count -= 1  # Track closing parentheses
                     self._advance()
                 
-                # Consume the closing parenthesis
+                # Final closing parenthesis should already be consumed by the loop
                 if self._current_token()["type"] == "RPAREN":
                     self._match("RPAREN", parent_node)
             else:
-                # Simple identifier - check if followed by pointer dereferencing
+                # Simple identifier assignment: SET var ASSIGN otherVar
                 if not self.identifierExists(token["value"]):
-                    # Add to symbol table for now (more lenient approach)
+                    # Lenient approach: add undeclared identifiers to symbol table
+                    # This allows for more flexible parsing but reduces error detection
                     self.symbol_table.add(token["value"])
                 self._match("IDENTIFIER", parent_node)
                 
-                # Check for pointer dereferencing after identifier
+                # Handle pointer member access on right side (e.g., SET x ASSIGN ptr->field)
                 if self._current_token()["type"] == "ARROW":
                     self._match("ARROW", parent_node)
                     if self._current_token()["type"] == "IDENTIFIER":
-                        self._match("IDENTIFIER", parent_node)
+                        self._match("IDENTIFIER", parent_node)  # Field name
                     else:
                         self.errors.append(ErrorMessages.EXPECTED_EXPRESSION.format(found_type=self._current_token()['type']))
                         return False
@@ -601,13 +926,32 @@ class SCLParser:
         return True
     
     def _if_statement(self, parent_node):
-        # if_statement => IF expression THEN statements? ENDIF
+        """
+        Parse conditional execution statements.
+        
+        Grammar Rule: if_statement → IF expression THEN statements? ENDIF
+        
+        Handles conditional control flow with:
+        - Condition evaluation between IF and THEN
+        - Optional statement block execution when condition is true
+        - Proper termination with ENDIF keyword
+        
+        Note: This is a simplified implementation that doesn't fully parse the
+        conditional expression - it just consumes tokens until THEN is found.
+        
+        Args:
+            parent_node (ParseTreeNode): Parent node to attach if statement to
+            
+        Returns:
+            bool: True if if statement parsed successfully, False otherwise
+        """
         print("Parsing if statement...")
         
         if not self._match("IF", parent_node):
             return False
         
-        # Parse condition (simplified - just consume until THEN)
+        # Parse condition expression (simplified approach)
+        # TODO: Implement proper expression parsing for conditions
         while self._current_token()["type"] != "THEN" and not self.is_at_end():
             self._advance()
         
@@ -799,6 +1143,25 @@ class SCLParser:
         return True
 
 def main():
+    """
+    Main entry point for the SCL parser when run as a standalone script.
+    
+    This function provides a command-line interface for parsing SCL token files.
+    It demonstrates the complete parsing workflow:
+    
+    1. Load tokenized input from JSON file
+    2. Create parser instance with required interface
+    3. Execute parsing using public methods
+    4. Demonstrate all required public functions
+    5. Output parsing results and statistics
+    6. Save parse tree to output file
+    
+    Usage:
+        python scl_parser.py <tokens_json_file>
+        
+    The tokens file should contain a JSON object with a 'tokens' array
+    where each token has 'type', 'value', 'line', and 'column' fields.
+    """
     if len(sys.argv) != 2:
         print("Usage: python scl_parser.py <tokens_json_file>")
         sys.exit(1)
@@ -806,21 +1169,22 @@ def main():
     input_file = sys.argv[1]
     
     try:
-        # Read tokens from JSON file
+        # Load tokenized input from scanner output
         with open(input_file, 'r') as f:
             tokens_data = json.load(f)
         
         print(f"Loaded {len(tokens_data['tokens'])} tokens from {input_file}")
         
-        # Create parser and use the required public interface
+        # Create parser instance and invoke the main parsing workflow
         parser = SCLParser(tokens_data)
-        result = parser.begin()  # Using the required public begin() function
+        result = parser.begin()  # Primary parsing entry point (required interface)
         
-        # Demonstrate the other required public functions
+        # Demonstrate all required public interface methods for specification compliance
         print(f"\n=== DEMONSTRATING PUBLIC FUNCTIONS ===")
         next_token = parser.getNextToken()
         print(f"getNextToken() returned: {next_token['type']} = '{next_token['value']}'")
         
+        # Test symbol table functionality with a common function name
         test_identifier = "main"
         exists = parser.identifierExists(test_identifier)
         print(f"identifierExists('{test_identifier}') returned: {exists}")
@@ -830,6 +1194,7 @@ def main():
         with open(output_file, 'w') as f:
             json.dump(result, f, indent=2)
         
+        # Comprehensive parsing results and statistics
         print(f"\n=== PARSING RESULTS ===")
         print(f"Success: {result['success']}")
         print(f"Tokens processed: {result['tokens_processed']}/{len(tokens_data['tokens'])}")
@@ -837,20 +1202,40 @@ def main():
         print(f"Errors: {len(result['errors'])}")
         print(f"Output saved to: {output_file}")
         
+        # Error reporting with detailed information for debugging
         if result['errors']:
-            print("\nErrors found:")
-            for error in result['errors']:
-                print(f"  - {error}")
+            print("\nParsing Errors Detected:")
+            for i, error in enumerate(result['errors'], 1):
+                print(f"  {i}. {error}")
+        else:
+            print("\n✓ No parsing errors detected")
         
+        # Symbol table contents for semantic analysis verification
         if result['symbol_table']:
-            print(f"\nSymbol Table ({len(result['symbol_table'])} items):")
+            print(f"\nSymbol Table Contents ({len(result['symbol_table'])} identifiers):")
             for symbol in sorted(result['symbol_table']):
                 print(f"  - {symbol}")
+        else:
+            print("\nSymbol table is empty - no identifiers declared")
                 
+    except FileNotFoundError:
+        print(f"Error: Input file '{input_file}' not found")
+        print("Please ensure the tokens file exists and is accessible")
+        sys.exit(1)
+    except json.JSONDecodeError as e:
+        print(f"Error: Invalid JSON format in '{input_file}': {e}")
+        print("Please ensure the input file contains valid JSON with a 'tokens' array")
+        sys.exit(1)
+    except KeyError as e:
+        print(f"Error: Missing required key in tokens file: {e}")
+        print("The input JSON must contain a 'tokens' key with an array of token objects")
+        sys.exit(1)
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"Unexpected error during parsing: {e}")
+        print("\nFull error traceback:")
         import traceback
         traceback.print_exc()
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
