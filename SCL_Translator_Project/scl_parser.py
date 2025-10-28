@@ -6,7 +6,7 @@ Complete Parser implementation for SCL language subset
 import json
 import sys
 from dataclasses import dataclass
-from typing import List, Any, Dict, Optional
+from typing import List, Any, Dict
 from scl_constants import VALID_TYPES, ErrorMessages, DebugMessages
 
 @dataclass

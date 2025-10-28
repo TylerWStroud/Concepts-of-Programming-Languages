@@ -182,8 +182,8 @@
     }
   ],
   "identifiers": [
-    "x",
-    "main"
+    "main",
+    "x"
   ],
   "summary": {
     "total_tokens": 30,

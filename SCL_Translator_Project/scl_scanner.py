@@ -7,7 +7,7 @@ import sys
 import json
 import re
 from enum import Enum
-from typing import List, Dict, Any, Optional
+from typing import List, Optional
 from dataclasses import dataclass
 
 class TokenType(Enum):

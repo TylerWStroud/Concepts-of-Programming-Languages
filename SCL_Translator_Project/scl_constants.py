@@ -1,5 +1,5 @@
 # scl_constants.py
-"""Constants and configuration for SCL language processing"""
+# Constants and configuration for SCL language processing
 
 # Valid data types
 VALID_TYPES = ["INTEGER", "DOUBLE", "FLOAT", "CHAR", "BYTE", "STRING", "BOOLEAN", "LONG", "ADDRESS"]

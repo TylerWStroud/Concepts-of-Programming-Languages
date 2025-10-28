@@ -284,8 +284,8 @@
     ]
   },
   "symbol_table": [
-    "main",
-    "x"
+    "x",
+    "main"
   ],
   "success": true,
   "errors": [],
