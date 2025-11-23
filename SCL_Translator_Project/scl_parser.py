@@ -1,8 +1,5 @@
-'''
+"""
 SCL Language Parser
-
-Complete recursive descent parser implementation for the SCL (Simple C-Like) language subset.
-This parser implements a top-down parsing strategy using recursive descent with predictive parsing.
 
 Key Features:
 - Recursive descent parsing with error recovery
@@ -19,9 +16,8 @@ Grammar Support:
 - Data structures: struct definitions, array declarations, pointer types
 - Statements: display, set, call, create, destroy, return, exit
 
-Author: SCL Translator Project
-Version: 1.0
-'''
+Author: Tyler Stroud
+"""
 
 import json
 import sys
@@ -32,9 +28,9 @@ from scl_constants import VALID_TYPES, ErrorMessages, DebugMessages
 @dataclass
 class ParseTreeNode:
     """
-    Represents a node in the Abstract Syntax Tree (AST) for the SCL parser.
+    Represents a node in the tree for the SCL parser.
     
-    This class encapsulates the hierarchical structure of parsed SCL code,
+    This class encapsulates the structure of parsed SCL code,
     storing both syntactic information (type, value) and source location data
     (line, column) for comprehensive error reporting and code analysis.
     
@@ -226,7 +222,7 @@ class SCLParser:
         Move to the next token in the input stream.
         
         Returns:
-            Dict[str, Any]: The previous token (the one we just moved past)
+            Dict[str, Any]: The previous token (the one the algorithm just moved past)
         """
         if self.current < len(self.tokens):
             self.current += 1
@@ -249,7 +245,7 @@ class SCLParser:
         """
         Look ahead one token without advancing the parser position.
         
-        Used for predictive parsing decisions where we need to see what's coming next.
+        Used for predictive parsing decisions where algorithm needs to see what's coming next.
         
         Returns:
             Dict[str, Any]: Next token or EOF if at end of stream
@@ -276,7 +272,7 @@ class SCLParser:
         type, and if so, optionally adds it to the parse tree and advances the parser.
         
         Args:
-            expected_type (str): The token type we expect to see (e.g., 'IDENTIFIER', 'FUNCTION')
+            expected_type (str): The token type expected to see (e.g., 'IDENTIFIER', 'FUNCTION')
             parent_node (ParseTreeNode, optional): Parent node to add matched token to in parse tree
             
         Returns:
@@ -312,7 +308,7 @@ class SCLParser:
         """
         Parse the root 'program' nonterminal according to SCL grammar.
         
-        Grammar Rule: program → import* specifications? forward_declarations? implementations function_definitions
+        Grammar Rule: program => import* specifications? forward_declarations? implementations function_definitions
         
         This is the top-level grammar rule that defines the overall structure of an SCL program.
         It handles the main sections in order: imports, specifications, forward declarations,
@@ -334,19 +330,38 @@ class SCLParser:
                 parent_node.add_child(import_node)
             else:
                 break  # Stop on first import parsing failure
-        
-        # Parse specifications section (optional) - type and struct definitions
-        if self._current_token()["type"] == "SPECIFICATIONS":
-            specs_node = ParseTreeNode("SPECIFICATIONS_SECTION")
-            if self._specifications_section(specs_node):
-                parent_node.add_child(specs_node)
-        
-        # Parse forward declarations (optional) - function signatures
-        if self._current_token()["type"] == "FORWARD":
-            forward_node = ParseTreeNode("FORWARD_DECLARATIONS")
-            if self._forward_declarations(forward_node):
-                parent_node.add_child(forward_node)
-        
+
+        # Parse symbol declarations (zero or more) - symbolic constants
+        while self._current_token()["type"] == "SYMBOL":
+            symbol_node = ParseTreeNode("SYMBOL_DECLARATION")
+            if self._symbol_declaration(symbol_node):
+                parent_node.add_child(symbol_node)
+            else:
+                break
+
+        # Parse specifications, forward declarations, and global declarations in any order
+        # These sections can appear in different orders depending on the SCL file
+        sections_to_parse = True
+        while sections_to_parse:
+            token = self._current_token()
+            sections_to_parse = False  # Reset flag
+
+            if token["type"] == "FORWARD":
+                forward_node = ParseTreeNode("FORWARD_DECLARATIONS")
+                if self._forward_declarations(forward_node):
+                    parent_node.add_child(forward_node)
+                sections_to_parse = True  # Continue checking for more sections
+            elif token["type"] == "SPECIFICATIONS":
+                specs_node = ParseTreeNode("SPECIFICATIONS_SECTION")
+                if self._specifications_section(specs_node):
+                    parent_node.add_child(specs_node)
+                sections_to_parse = True  # Continue checking for more sections
+            elif token["type"] == "IDENTIFIER" and token["value"] == "global":
+                global_node = ParseTreeNode("GLOBAL_DECLARATIONS")
+                if self._global_declarations(global_node):
+                    parent_node.add_child(global_node)
+                sections_to_parse = True  # Continue checking for more sections
+
         # Parse implementations section (required) - marks start of implementation code
         if not self._match("IMPLEMENTATIONS", parent_node):
             self.errors.append(ErrorMessages.EXPECTED_IMPLEMENTATIONS)
@@ -363,7 +378,7 @@ class SCLParser:
         """
         Parse import statement for external file inclusion.
         
-        Grammar Rule: import → IMPORT (STRING | ANGLE_BRACKET_STRING)
+        Grammar Rule: import => IMPORT (STRING | ANGLE_BRACKET_STRING)
         
         Handles SCL import statements that include external files or libraries.
         Supports both quoted strings ("filename.h") and angle bracket notation (<filename.h>).
@@ -382,7 +397,7 @@ class SCLParser:
         
         token = self._current_token()
         if token["type"] in ["STRING", "LESS_THAN"]:
-            # Consume import content until we reach a section boundary or file extension
+            # Consume import content until reach a section boundary or file extension
             # This is a simplified approach that handles most common import patterns
             while (self._current_token()["type"] not in ["IMPORT", "SPECIFICATIONS", 
                                                         "FORWARD", "IMPLEMENTATIONS", "EOF"] and
@@ -399,28 +414,34 @@ class SCLParser:
             return False
         
     def _specifications_section(self, parent_node):
-        """specifications → SPECIFICATIONS (struct_definition | type_definition)*"""
+        # specifications => SPECIFICATIONS (struct_definition | type_definition | enum_definition)*
         print("Parsing specifications section...")
-        
+
         if not self._match("SPECIFICATIONS", parent_node):
             return False
-        
-        # Parse struct and type definitions
-        while (self._current_token()["type"] == "STRUCT" or 
-               (self._current_token()["type"] == "IDENTIFIER" and self._current_token()["value"] == "definetype")):
-            if self._current_token()["type"] == "STRUCT":
+
+        # Parse struct, type, and enum definitions
+        while True:
+            token = self._current_token()
+            if token["type"] == "STRUCT":
                 struct_node = ParseTreeNode("STRUCT_DEFINITION")
                 if self._struct_definition(struct_node):
                     parent_node.add_child(struct_node)
-            elif (self._current_token()["type"] == "IDENTIFIER" and self._current_token()["value"] == "definetype"):
+            elif token["type"] == "IDENTIFIER" and token["value"] == "definetype":
                 type_node = ParseTreeNode("TYPE_DEFINITION")
                 if self._type_definition(type_node):
                     parent_node.add_child(type_node)
-    
+            elif token["type"] == "ENUMERATE":  # ENUMERATE is a keyword token
+                enum_node = ParseTreeNode("ENUM_DEFINITION")
+                if self._enum_definition(enum_node):
+                    parent_node.add_child(enum_node)
+            else:
+                break  # Exit when no more specs to parse
+
         return True
 
     def _forward_declarations(self, parent_node):
-        """forward_declarations → FORWARD DECLARATIONS function_declaration+"""
+        # forward_declarations => FORWARD DECLARATIONS function_declaration+
         print("Parsing forward declarations...")
         
         if not self._match("FORWARD", parent_node):
@@ -441,7 +462,7 @@ class SCLParser:
         """
         Parse a complete function definition including signature and body.
         
-        Grammar Rule: function_definition → FUNCTION IDENTIFIER RETURN (pointer)? TYPE type 
+        Grammar Rule: function_definition => FUNCTION IDENTIFIER RETURN (pointer)? TYPE type 
                                           (IS variables? structures? statements? ENDFUN IDENTIFIER)?
         
         This method handles both function declarations (signature only) and full function 
@@ -553,7 +574,7 @@ class SCLParser:
         """
         Parse variable definition statements with type checking.
         
-        Grammar Rule: define_statement → DEFINE IDENTIFIER (ARRAY [size] OF)? TYPE type
+        Grammar Rule: define_statement => DEFINE IDENTIFIER (ARRAY [size] OF)? TYPE type
         
         Handles variable declarations including:
         - Simple variable definitions: DEFINE x TYPE INTEGER
@@ -623,7 +644,7 @@ class SCLParser:
         """
         Parse a sequence of executable statements.
         
-        Grammar Rule: statements → (display_statement | set_statement | call_statement | 
+        Grammar Rule: statements => (display_statement | set_statement | call_statement | 
                                      create_statement | destroy_statement | return_statement |
                                      if_statement | for_statement | exit_statement)+
         
@@ -647,7 +668,7 @@ class SCLParser:
         print(DebugMessages.PARSING_STATEMENTS)
         
         statement_count = 0
-        # Parse statements until we encounter a non-statement token
+        # Parse statements until encounter a non-statement token
         while self._current_token()["type"] in ["DISPLAY", "SET", "CALL", "CREATE", "DESTROY", "RETURN", "IF", "FOR", "EXIT"]:
             stmt_type = self._current_token()["type"]
             stmt_node = ParseTreeNode("STATEMENT", value=stmt_type)
@@ -686,7 +707,7 @@ class SCLParser:
         return True
     
     def _structures_section(self, parent_node):
-        """structures_section → structures define_statement+"""
+        # structures_section => structures define_statement+
         print("Parsing structures section...")
         
         # Match the "structures" keyword
@@ -713,7 +734,7 @@ class SCLParser:
         """
         Parse output/print statements for displaying values.
         
-        Grammar Rule: display_statement → DISPLAY (STRING | IDENTIFIER) (COMMA (STRING | IDENTIFIER))*
+        Grammar Rule: display_statement => DISPLAY (STRING | IDENTIFIER) (COMMA (STRING | IDENTIFIER))*
         
         Handles output statements that can display:
         - String literals: DISPLAY "Hello World"
@@ -755,7 +776,7 @@ class SCLParser:
         """
         Parse assignment statements for variable modification.
         
-        Grammar Rule: set_statement → SET IDENTIFIER ASSIGN expression
+        Grammar Rule: set_statement => SET IDENTIFIER ASSIGN expression
         
         Handles various forms of assignment including:
         - Simple assignment: SET x ASSIGN 5
@@ -788,7 +809,7 @@ class SCLParser:
         if not self.identifierExists(var_name):
             self.errors.append(ErrorMessages.VARIABLE_NOT_DECLARED.format(var_name=var_name, context="SET statement"))
         
-        # Handle pointer member access on left side (e.g., nodePtr->field)
+        # Handle pointer member access on left side 
         if self._current_token()["type"] == "ARROW":
             self._match("ARROW", parent_node)
             if not self._match("IDENTIFIER", parent_node):
@@ -798,7 +819,7 @@ class SCLParser:
         if not self._match("ASSIGN", parent_node):
             return False
         
-        # Handle address-of operator on right side (e.g., SET ptr ASSIGN ADDRESS var)
+        # Handle address-of operator on right side 
         if self._current_token()["type"] == "ADDRESS":
             self._match("ADDRESS", parent_node)
             if not self._match("IDENTIFIER", parent_node):
@@ -816,12 +837,12 @@ class SCLParser:
                 
                 # Parse function parameters using parentheses balancing
                 # This handles nested function calls and complex parameter expressions
-                paren_count = 1
-                while paren_count > 0 and not self.is_at_end():
+                parenthesis_count = 1
+                while parenthesis_count > 0 and not self.is_at_end():
                     if self._current_token()["type"] == "LPAREN":
-                        paren_count += 1  # Track nested parentheses
+                        parenthesis_count += 1  # Track nested parentheses
                     elif self._current_token()["type"] == "RPAREN":
-                        paren_count -= 1  # Track closing parentheses
+                        parenthesis_count -= 1  # Track closing parentheses
                     self._advance()
                 
                 # Final closing parenthesis should already be consumed by the loop
@@ -929,7 +950,7 @@ class SCLParser:
         """
         Parse conditional execution statements.
         
-        Grammar Rule: if_statement → IF expression THEN statements? ENDIF
+        Grammar Rule: if_statement => IF expression THEN statements? ENDIF
         
         Handles conditional control flow with:
         - Condition evaluation between IF and THEN
@@ -1006,66 +1027,121 @@ class SCLParser:
         return True
     
     def _struct_definition(self, parent_node):
-        """struct_definition → STRUCT IDENTIFIER IS variables? ENDSTRUCT IDENTIFIER"""
+        # struct_definition => STRUCT IDENTIFIER IS (variables | structures)* ENDSTRUCT IDENTIFIER
         print("Parsing struct definition...")
-        
+
         if not self._match("STRUCT", parent_node):
             return False
-        
+
         # Struct name
         if not self._match("IDENTIFIER", parent_node):
             return False
         struct_name = self._previous_token()["value"]
         self.symbol_table.add(struct_name)
-        
+
         if not self._match("IS", parent_node):
             return False
-        
+
         # Variables section (optional)
         if self._current_token()["type"] == "VARIABLES":
             variables_node = ParseTreeNode("VARIABLES_SECTION")
             if self._variables_section(variables_node):
                 parent_node.add_child(variables_node)
-        
+
+        # Structures section (optional) - for struct-type fields
+        if self._current_token()["type"] == "STRUCTURES":
+            structures_node = ParseTreeNode("STRUCTURES_SECTION")
+            if self._structures_section(structures_node):
+                parent_node.add_child(structures_node)
+
         # ENDSTRUCT
         if not self._match("ENDSTRUCT", parent_node):
             return False
-        
+
         # Struct name (again)
         if not self._match("IDENTIFIER", parent_node):
             return False
-        
+
         endstruct_name = self._previous_token()["value"]
         if endstruct_name != struct_name:
             self.errors.append(f"Struct name mismatch: expected {struct_name}, found {endstruct_name}")
-        
+
+        return True
+
+    def _enum_definition(self, parent_node):
+        """Parse enumerate type definition: enumerate NAME is ... endenum NAME"""
+        print("Parsing enum definition...")
+
+        # Match ENUMERATE keyword (it's a token type, not IDENTIFIER)
+        if not self._match("ENUMERATE", parent_node):
+            return False
+
+        # Enum name
+        if not self._match("IDENTIFIER", parent_node):
+            return False
+        enum_name = self._previous_token()["value"]
+        self.symbol_table.add(enum_name)
+
+        # IS keyword
+        if not self._match("IS", parent_node):
+            return False
+
+        # Parse enum values (comma-separated identifiers)
+        while self._current_token()["type"] not in ["ENDENUM", "EOF"]:
+            if self._current_token()["type"] == "IDENTIFIER":
+                self._match("IDENTIFIER", parent_node)
+                enum_value = self._previous_token()["value"]
+                self.symbol_table.add(enum_value)
+            elif self._current_token()["type"] == "COMMA":
+                self._match("COMMA", parent_node)
+            else:
+                break
+
+        # ENDENUM keyword (it's a token type, not IDENTIFIER)
+        if not self._match("ENDENUM", parent_node):
+            self.errors.append(f"Expected ENDENUM, found {self._current_token()['type']}")
+            return False
+
+        # Enum name again
+        if not self._match("IDENTIFIER", parent_node):
+            return False
+        endenum_name = self._previous_token()["value"]
+        if endenum_name != enum_name:
+            self.errors.append(f"Enum name mismatch: expected {enum_name}, found {endenum_name}")
+
         return True
 
     def _type_definition(self, parent_node):
-        """type_definition → DEFINETYPE STRUCT IDENTIFIER IDENTIFIER"""
+        # type_definition => DEFINETYPE (STRUCT | IDENTIFIER) IDENTIFIER IDENTIFIER
+        # Handles: definetype struct X Y, definetype pointer X Y, definetype X Y
         print("Parsing type definition...")
-        
+
         if not self._match("IDENTIFIER", parent_node):  # DEFINETYPE
             return False
-        
-        if not self._match("STRUCT", parent_node):
-            return False
-        
-        # Original struct name
+
+        # Check for STRUCT or pointer keyword (IDENTIFIER with value "pointer")
+        if self._current_token()["type"] == "STRUCT":
+            self._match("STRUCT", parent_node)
+        elif (self._current_token()["type"] == "IDENTIFIER" and
+              self._current_token()["value"] == "pointer"):
+            self._match("IDENTIFIER", parent_node)  # matches "pointer"
+        # Otherwise it's a direct type alias, no keyword needed
+
+        # Original type name
         if not self._match("IDENTIFIER", parent_node):
             return False
         original_name = self._previous_token()["value"]
-        
-        # New type name
+
+        # New type name (alias)
         if not self._match("IDENTIFIER", parent_node):
             return False
         type_name = self._previous_token()["value"]
         self.symbol_table.add(type_name)
-        
+
         return True
 
     def _function_declaration(self, parent_node):
-        """function_declaration → FUNCTION IDENTIFIER RETURN (pointer)? TYPE type parameters?"""
+        # function_declaration => FUNCTION IDENTIFIER RETURN (pointer)? TYPE type parameters?
         print("Parsing function declaration...")
         
         if not self._match("FUNCTION", parent_node):
@@ -1103,8 +1179,111 @@ class SCLParser:
         
         return True
 
+    def _symbol_declaration(self, parent_node):
+        """Parse symbol (constant) declaration: symbol NAME value"""
+        print("Parsing symbol declaration...")
+
+        if not self._match("SYMBOL", parent_node):
+            return False
+
+        # Symbol name (identifier)
+        if not self._match("IDENTIFIER", parent_node):
+            return False
+        symbol_name = self._previous_token()["value"]
+        self.symbol_table.add(symbol_name)
+
+        # Symbol value (number or hex number)
+        token_type = self._current_token()["type"]
+        if token_type in ["NUMBER", "HEX_NUMBER", "IDENTIFIER"]:
+            self._match(token_type, parent_node)
+        else:
+            self.errors.append(f"Expected value for symbol {symbol_name}")
+            return False
+
+        return True
+
+    def _global_declarations(self, parent_node):
+        """Parse global declarations section"""
+        print("Parsing global declarations...")
+
+        # Match "global" keyword (comes as IDENTIFIER)
+        if not self._match("IDENTIFIER", parent_node):  # "global"
+            return False
+
+        # Match "declarations" keyword
+        if not self._match("IDENTIFIER", parent_node):  # "declarations"
+            return False
+
+        # Parse constants section (optional)
+        if self._current_token()["type"] == "IDENTIFIER" and self._current_token()["value"] == "constants":
+            constants_node = ParseTreeNode("CONSTANTS_SECTION")
+            if self._constants_section(constants_node):
+                parent_node.add_child(constants_node)
+
+        # Parse variables section (optional)
+        if self._current_token()["type"] == "VARIABLES":
+            variables_node = ParseTreeNode("VARIABLES_SECTION")
+            if self._variables_section(variables_node):
+                parent_node.add_child(variables_node)
+
+        # Parse structures section (optional)
+        if self._current_token()["type"] == "STRUCTURES":
+            structures_node = ParseTreeNode("STRUCTURES_SECTION")
+            if self._structures_section(structures_node):
+                parent_node.add_child(structures_node)
+
+        return True
+
+    def _constants_section(self, parent_node):
+        """Parse constants section with initialized values"""
+        print("Parsing constants section...")
+
+        # Match "constants" keyword
+        if not self._match("IDENTIFIER", parent_node):
+            return False
+
+        # Parse constant definitions
+        while self._current_token()["type"] == "DEFINE":
+            const_node = ParseTreeNode("CONSTANT_DEFINE")
+            if not self._constant_define(const_node):
+                break
+            parent_node.add_child(const_node)
+
+        return True
+
+    def _constant_define(self, parent_node):
+        """Parse constant definition: define NAME = value of type TYPE"""
+        if not self._match("DEFINE", parent_node):
+            return False
+
+        # Constant name
+        if not self._match("IDENTIFIER", parent_node):
+            return False
+        const_name = self._previous_token()["value"]
+        self.symbol_table.add(const_name)
+
+        # Assignment
+        if self._current_token()["type"] == "ASSIGN":
+            self._match("ASSIGN", parent_node)
+            # Value
+            token_type = self._current_token()["type"]
+            if token_type in ["NUMBER", "FLOAT_NUMBER", "STRING", "IDENTIFIER"]:
+                self._match(token_type, parent_node)
+
+        # "of type"
+        if self._current_token()["type"] == "OF":
+            self._match("OF", parent_node)
+            if self._current_token()["type"] == "TYPE":
+                self._match("TYPE", parent_node)
+                # Type name
+                token_type = self._current_token()["type"]
+                if token_type in ["INTEGER", "DOUBLE", "FLOAT", "CHAR", "STRING", "BOOLEAN"]:
+                    self._match(token_type, parent_node)
+
+        return True
+
     def _function_definitions(self, parent_node):
-        """function_definitions → function_definition+"""
+        # function_definitions => function_definition+
         print("Parsing function definitions...")
         
         function_count = 0
@@ -1123,13 +1302,13 @@ class SCLParser:
         return True
 
     def _function_parameters(self, parent_node):
-        """function_parameters → PARAMETERS parameter_list"""
+        # function_parameters => PARAMETERS parameter_list
         print("Parsing function parameters...")
         
         if not self._match("PARAMETERS", parent_node):
             return False
         
-        # Parse parameter list - consume until we hit IS, FUNCTION, or EOF
+        # Parse parameter list - consume until hit IS, FUNCTION, or EOF
         while (self._current_token()["type"] not in ["FUNCTION", "IMPLEMENTATIONS", "EOF", "IS"] and
                not self.is_at_end()):
             # Add parameter tokens to the parse tree
